@@ -2,8 +2,7 @@ from pathlib import Path
 from typing import List, Tuple
 from sentence_transformers import SentenceTransformer, util
 
-# Load model once at startup
-model = SentenceTransformer("all-MiniLM-L6-v2")
+# Model will be loaded lazily to prevent blocking startup
 
 class KnowledgeChunk:
     def __init__(self, text: str, topic: str):
@@ -25,12 +24,26 @@ def load_knowledge(base_path: str = "../data") -> List[KnowledgeChunk]:
     return chunks
 
 knowledge_chunks = load_knowledge()
-knowledge_texts = [c.text for c in knowledge_chunks]
-knowledge_embeddings = model.encode(knowledge_texts, convert_to_tensor=True)
+_initialized = False
+model = None
+knowledge_embeddings = None
+
+def _init_rag():
+    global _initialized, model, knowledge_embeddings
+    if not _initialized:
+        print("Lazy loading SentenceTransformer model...")
+        model = SentenceTransformer("all-MiniLM-L6-v2")
+        if knowledge_chunks:
+            knowledge_texts = [c.text for c in knowledge_chunks]
+            knowledge_embeddings = model.encode(knowledge_texts, convert_to_tensor=True)
+        _initialized = True
 
 def retrieve_relevant(query: str, top_k: int = 3) -> List[KnowledgeChunk]:
     if not knowledge_chunks:
         return []
+        
+    _init_rag()
+    
     query_emb = model.encode(query, convert_to_tensor=True)
     hits = util.semantic_search(query_emb, knowledge_embeddings, top_k=top_k)[0]
     return [knowledge_chunks[h["corpus_id"]] for h in hits]
