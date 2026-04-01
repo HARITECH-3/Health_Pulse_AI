@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import List, Tuple
-from sentence_transformers import SentenceTransformer, util
+# Heavy imports moved to lazy functions to prevent startup timeout
 
 # Model will be loaded lazily to prevent blocking startup
 
@@ -32,6 +32,7 @@ def _init_rag():
     global _initialized, model, knowledge_embeddings
     if not _initialized:
         print("Lazy loading SentenceTransformer model...")
+        from sentence_transformers import SentenceTransformer
         model = SentenceTransformer("all-MiniLM-L6-v2")
         if knowledge_chunks:
             knowledge_texts = [c.text for c in knowledge_chunks]
@@ -43,6 +44,7 @@ def retrieve_relevant(query: str, top_k: int = 3) -> List[KnowledgeChunk]:
         return []
         
     _init_rag()
+    from sentence_transformers import util
     
     query_emb = model.encode(query, convert_to_tensor=True)
     hits = util.semantic_search(query_emb, knowledge_embeddings, top_k=top_k)[0]
